@@ -34,6 +34,12 @@ allprojects {
         runtimeOnly("org.junit.jupiter:junit-jupiter-engine:5.9.0")
         implementation("org.junit.jupiter:junit-jupiter-params:5.9.0")
         runtimeOnly("org.junit.platform:junit-platform-console:1.9.0")
+
+        // coroutines
+        implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
+
+        // for console interaction
+        implementation("com.github.ajalt.clikt:clikt:4.0.0")
     }
 
     tasks.test {

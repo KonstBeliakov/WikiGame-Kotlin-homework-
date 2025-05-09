@@ -1,0 +1,6 @@
+.idea
+.gradle
+buildSrc/.gradle
+buildSrc/build
+build
+task1/build

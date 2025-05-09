@@ -1,5 +1,5 @@
 package jub.task1
 
-fun main() {
-    // Write your code
-}
+import jub.task1.game.WikiGameApp
+
+fun main(args: Array<String>) = WikiGameApp().main(args)
