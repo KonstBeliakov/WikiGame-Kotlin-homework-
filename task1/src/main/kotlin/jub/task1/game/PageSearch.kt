@@ -1,7 +1,6 @@
 package jub.task1.game
 
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 
@@ -15,6 +14,7 @@ data class SearchPath(
 class PageSearch(
     private val finalPage: String = KOTLIN_PAGE,
 ) {
+    @OptIn(ExperimentalCoroutinesApi::class)
     suspend fun search(startPage: String, searchDepth: Int, threadsCount: Int): SearchPath? {
         val page = getHtmlDocument(startPage)
         val links = extractReferences(page)
@@ -25,19 +25,23 @@ class PageSearch(
         val parents: ConcurrentHashMap<String, String> = ConcurrentHashMap()
         parents[startPage] = startPage
 
-        return this._search(queue, searchDepth, parents)
+        val dispatcher = Dispatchers.IO.limitedParallelism(threadsCount)
+
+        return this.searchOnLevel(queue, searchDepth, parents, dispatcher)
     }
 
-    suspend fun _search(queue: ConcurrentLinkedQueue<String>, maxDepth: Int, parents: ConcurrentHashMap<String, String>): SearchPath? {
-        if(maxDepth == 0){
+    private suspend fun searchOnLevel(queue: ConcurrentLinkedQueue<String>, maxDepth: Int,
+                                      parents: ConcurrentHashMap<String, String>,
+                                      dispatcher: CoroutineDispatcher): SearchPath? {
+        if (maxDepth == 0) {
             return null
         }
 
-        for(link in queue){
-            if(link == this.finalPage){
+        for (link in queue) {
+            if (link == this.finalPage) {
                 val path = mutableListOf(this.finalPage)
                 var currentLink = link
-                while(parents[currentLink] != currentLink){
+                while (parents[currentLink] != currentLink) {
                     parents[currentLink]?.let { path.add(it) }
                     currentLink = parents[currentLink].toString()
                 }
@@ -48,22 +52,20 @@ class PageSearch(
         val queueNext: ConcurrentLinkedQueue<String> = ConcurrentLinkedQueue()
         val jobs: MutableList<Job> = mutableListOf()
 
-        while(queue.isNotEmpty()){
+        while (queue.isNotEmpty()) {
             val parentLink = queue.poll()
-            launch{
+            launch(dispatcher) {
                 val page = getHtmlDocument(parentLink)
                 val list = extractReferences(page)
                 list.forEach { childLink ->
-                    if(parents.putIfAbsent(childLink, parentLink) == null) {
-                        queueNext.add(childLink)
-                    }
+                    parents.putIfAbsent(childLink, parentLink) ?: queueNext.add(childLink)
                 }
-            }.also{
+            }.also {
                 jobs.add(it)
             }
         }
         jobs.joinAll()
-        return _search(queueNext, maxDepth - 1, parents)
+        return searchOnLevel(queueNext, maxDepth - 1, parents, dispatcher)
     }
 
     companion object {
@@ -72,8 +74,10 @@ class PageSearch(
     }
 }
 
-fun main(){
+fun main() {
     val pageSearch = PageSearch()
-
+    runBlocking {
+        print(pageSearch.search("https://en.wikipedia.org/wiki/Abstraction_(computer_science)", 5, 16))
+    }
 }
 
